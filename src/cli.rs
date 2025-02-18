@@ -1,4 +1,8 @@
+use std::path::{Path, PathBuf};
+
 use clap::{Parser, Subcommand};
+
+use crate::repo_create;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -15,7 +19,11 @@ enum Commands {
     Checkout,
     Commit,
     HashObject,
-    Init,
+    /// Initialize a new, empty repository.
+    Init {
+        /// Where to create the repository.
+        path: PathBuf,
+    },
     Log,
     LsFiles,
     LsTree,
@@ -36,7 +44,6 @@ pub fn start() {
         Commands::Checkout => todo!(),
         Commands::Commit => todo!(),
         Commands::HashObject => todo!(),
-        Commands::Init => todo!(),
         Commands::Log => todo!(),
         Commands::LsFiles => todo!(),
         Commands::LsTree => todo!(),
@@ -45,5 +52,8 @@ pub fn start() {
         Commands::ShowRef => todo!(),
         Commands::Status => todo!(),
         Commands::Tag => todo!(),
+        Commands::Init { path } => {
+            repo_create(path).unwrap();
+        }
     }
 }
