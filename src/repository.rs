@@ -11,7 +11,6 @@ pub struct Repository {
 impl Repository {
     pub fn new(path: PathBuf, force: bool) -> Self {
         let gitdir = path.join(".git");
-        // let res =
 
         if !(force || gitdir.is_dir()) {
             panic!("Not a Git Repository {:?}", path)
@@ -26,9 +25,16 @@ impl Repository {
         };
 
         if !force {
-            conf.section(Some("core"))
+            let vers = conf
+                .section(Some("core"))
                 .unwrap()
-                .get("repositoryformatversion");
+                .get("repositoryformatversion")
+                .unwrap()
+                .parse::<i64>()
+                .unwrap();
+            if vers != 0 {
+                panic!("Unsupported repositoryformatversion:{}", vers);
+            }
         }
 
         Self {
