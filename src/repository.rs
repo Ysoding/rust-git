@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{bail, Result};
@@ -49,7 +49,7 @@ impl Repository {
         })
     }
 
-    fn repo_path(&self, p: PathBuf) -> PathBuf {
+    pub fn repo_path(&self, p: PathBuf) -> PathBuf {
         self.gitdir.join(p)
     }
 }
@@ -105,7 +105,7 @@ fn repo_default_config() -> Ini {
     conf
 }
 
-fn repo_file(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<PathBuf> {
+pub fn repo_file(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<PathBuf> {
     if let Some(parent) = path.parent().map(|p| p.to_path_buf()) {
         if parent != PathBuf::from("") {
             repo_dir(repo, parent, mkdir)?;
@@ -130,5 +130,23 @@ fn repo_dir(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<Option<Path
         Ok(Some(p))
     } else {
         Ok(None)
+    }
+}
+
+pub fn repo_find(path: &Path, required: bool) -> Result<Option<Repository>> {
+    let path = fs::canonicalize(path)?;
+
+    if path.join(".git").is_dir() {
+        return Ok(Some(Repository::new(path, false)?));
+    }
+
+    if let Some(parent) = path.parent() {
+        return repo_find(parent, required);
+    }
+
+    if required {
+        bail!("No git directory.");
+    } else {
+        return Ok(None);
     }
 }
