@@ -22,7 +22,7 @@ impl Repository {
         }
 
         let conf = if gitdir.join("config").exists() {
-            Ini::load_from_file("conf.ini").unwrap()
+            Ini::load_from_file(gitdir.join("config"))?
         } else if !force {
             bail!("Configuration file missing");
         } else {
@@ -35,8 +35,7 @@ impl Repository {
                 .unwrap()
                 .get("repositoryformatversion")
                 .unwrap()
-                .parse::<i64>()
-                .unwrap();
+                .parse::<i64>()?;
             if vers != 0 {
                 bail!("Unsupported repositoryformatversion:{}", vers);
             }

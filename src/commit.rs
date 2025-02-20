@@ -1,11 +1,13 @@
 use indexmap::IndexMap;
 
+use crate::Object;
+
 /// We use an IndexMap to preserve insertion order. Keys are of type Option<Vec<u8>>:
 /// - Some(key) holds header fields (like "tree", "parent", "author", etc.).
 /// - None is reserved for the commit message.
 pub type Kvlm = IndexMap<Option<Vec<u8>>, Vec<Vec<u8>>>;
 
-pub fn kvlm_parse(raw: &[u8]) -> Kvlm {
+fn kvlm_parse(raw: &[u8]) -> Kvlm {
     let mut dict: Kvlm = IndexMap::new();
     let mut pos = 0;
 
@@ -76,6 +78,72 @@ fn continuation_line_optmize(value: &[u8]) -> Vec<u8> {
     optmize_value
 }
 
+pub fn kvlm_serialize(kvlm: &Kvlm) -> Vec<u8> {
+    let mut ret = Vec::new();
+    for (key_opt, values) in kvlm.iter() {
+        if key_opt.is_none() {
+            continue;
+        }
+
+        let key = key_opt.as_ref().unwrap();
+        for value in values {
+            ret.extend_from_slice(key);
+            ret.push(b' ');
+            // In continuation lines, insert a space after each newline.
+            let mut tmp = Vec::new();
+            let mut i = 0;
+            while i < value.len() {
+                if value[i] == b'\n' {
+                    tmp.push(b'\n');
+                    tmp.push(b' ');
+                    i += 1;
+                } else {
+                    tmp.push(value[i]);
+                    i += 1;
+                }
+            }
+            ret.extend_from_slice(&tmp);
+            ret.push(b'\n');
+        }
+    }
+    ret.push(b'\n');
+    if let Some(msgs) = kvlm.get(&None) {
+        ret.extend_from_slice(&msgs[0]);
+    }
+    ret
+}
+
+pub struct Commit {
+    pub kvlm: Kvlm,
+}
+
+impl Commit {
+    pub fn new() -> Self {
+        Self {
+            kvlm: IndexMap::new(),
+        }
+    }
+
+    pub fn deserialize(data: &[u8]) -> Self {
+        let kvlm = kvlm_parse(data);
+        Self { kvlm }
+    }
+}
+
+impl Object for Commit {
+    fn fmt(&self) -> &'static [u8] {
+        b"commit"
+    }
+
+    fn serialize(&self) -> Vec<u8> {
+        kvlm_serialize(&self.kvlm)
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::commit::continuation_line_optmize;
@@ -86,10 +154,6 @@ mod tests {
 
         let optimized = continuation_line_optmize(raw_data);
         let expected = b"value\nvalue continued\nmore value";
-
-        let optimized_str = String::from_utf8_lossy(&optimized);
-        let expected_str = String::from_utf8_lossy(expected);
-
-        assert_eq!(optimized_str.trim(), expected_str.trim());
+        assert_eq!(optimized, expected);
     }
 }

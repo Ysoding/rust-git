@@ -1,8 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::{cat_file, hash_object, repo_create, repo_find};
+use crate::{cat_file, checkout, hash_object, log, ls_tree, repo_create};
 
 #[derive(Parser)]
 #[command(name="rit",version, about, long_about = None)]
@@ -42,8 +42,14 @@ enum Commands {
         object: String,
     },
     CheckIgnore,
-    Checkout,
     Commit,
+    /// Checkout a commit inside of a directory.
+    Checkout {
+        /// The commit or tree to checkout.
+        commit: String,
+        /// The EMPTY directory to checkout on.
+        path: PathBuf,
+    },
     /// Compute object ID and optionally creates a blob from a file
     HashObject {
         #[arg(
@@ -68,9 +74,21 @@ enum Commands {
         /// Where to create the repository.
         path: PathBuf,
     },
-    Log,
+    /// Display history of a given commit.
+    Log {
+        /// Commit to start at.
+        #[arg(default_value = "HEAD")]
+        commit: String,
+    },
     LsFiles,
-    LsTree,
+    /// Pretty-print a tree object.
+    LsTree {
+        /// Recurse into sub-trees
+        #[arg(short)]
+        recursive: bool,
+        /// A tree-ish object.
+        tree: String,
+    },
     RevParse,
     Rm,
     ShowRef,
@@ -84,11 +102,8 @@ pub fn start() {
     match cli.command {
         Commands::Add => todo!(),
         Commands::CheckIgnore => todo!(),
-        Commands::Checkout => todo!(),
         Commands::Commit => todo!(),
-        Commands::Log => todo!(),
         Commands::LsFiles => todo!(),
-        Commands::LsTree => todo!(),
         Commands::RevParse => todo!(),
         Commands::Rm => todo!(),
         Commands::ShowRef => todo!(),
@@ -101,8 +116,7 @@ pub fn start() {
             object_type,
             object,
         } => {
-            let repo = repo_find(Path::new("."), true).unwrap().unwrap();
-            cat_file(&repo, &object, Some(&object_type.as_bytes())).unwrap();
+            cat_file(&object, Some(&object_type.as_bytes())).unwrap();
         }
         Commands::HashObject {
             object_type,
@@ -113,6 +127,15 @@ pub fn start() {
                 "{}",
                 hash_object(&path, object_type.as_bytes(), write,).unwrap()
             );
+        }
+        Commands::Log { commit } => {
+            log(&commit).unwrap();
+        }
+        Commands::LsTree { recursive, tree } => {
+            ls_tree(&tree, recursive).unwrap();
+        }
+        Commands::Checkout { commit, path } => {
+            checkout(&commit, &path).unwrap();
         }
     }
 }

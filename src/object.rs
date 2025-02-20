@@ -1,4 +1,5 @@
 use std::{
+    any::Any,
     fs,
     io::{Read, Write},
     path::PathBuf,
@@ -8,16 +9,22 @@ use anyhow::{anyhow, bail, Result};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
 use sha1::{Digest, Sha1};
 
-use crate::{repo_file, Repository};
+use crate::{repo_file, Blob, Repository};
 
 pub trait Object {
     /// Returns the object type as bytes (e.g. b"blob").
     fn fmt(&self) -> &'static [u8];
     fn serialize(&self) -> Vec<u8>;
+    fn as_any(&self) -> &dyn Any;
 }
 
-pub fn object_find(repo: &Repository, name: &str, fmt: Option<&[u8]>, _follow: bool) -> String {
-    name.to_string()
+pub fn object_find(
+    _repo: &Repository,
+    name: &str,
+    _fmt: Option<&[u8]>,
+    _follow: bool,
+) -> Result<String> {
+    Ok(name.to_string())
 }
 
 pub fn object_read(repo: &Repository, sha: &str) -> Result<Box<dyn Object>> {
@@ -91,30 +98,4 @@ pub fn object_write(obj: &dyn Object, repo: Option<&Repository>) -> Result<Strin
     }
 
     Ok(sha)
-}
-
-pub struct Blob {
-    pub blobdata: Vec<u8>,
-}
-
-impl Blob {
-    pub fn new(data: &[u8]) -> Self {
-        Self {
-            blobdata: data.to_vec(),
-        }
-    }
-
-    pub fn deserialize(data: &[u8]) -> Self {
-        Self::new(data)
-    }
-}
-
-impl Object for Blob {
-    fn fmt(&self) -> &'static [u8] {
-        b"blob"
-    }
-
-    fn serialize(&self) -> Vec<u8> {
-        self.blobdata.clone()
-    }
 }
