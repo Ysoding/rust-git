@@ -10,7 +10,7 @@ use ini::Ini;
 pub struct Repository {
     worktree: PathBuf,
     gitdir: PathBuf,
-    conf: Ini,
+    _conf: Ini,
 }
 
 impl Repository {
@@ -44,7 +44,7 @@ impl Repository {
         Ok(Self {
             gitdir,
             worktree: path,
-            conf,
+            _conf: conf,
         })
     }
 
@@ -113,7 +113,7 @@ pub fn repo_file(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<PathBu
     Ok(repo.repo_path(path))
 }
 
-fn repo_dir(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<Option<PathBuf>> {
+pub fn repo_dir(repo: &Repository, path: PathBuf, mkdir: bool) -> Result<Option<PathBuf>> {
     let p = repo.repo_path(path);
 
     if p.exists() {

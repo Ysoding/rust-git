@@ -7,7 +7,7 @@ use crate::Object;
 /// - None is reserved for the commit message.
 pub type Kvlm = IndexMap<Option<Vec<u8>>, Vec<Vec<u8>>>;
 
-fn kvlm_parse(raw: &[u8]) -> Kvlm {
+pub fn kvlm_parse(raw: &[u8]) -> Kvlm {
     let mut dict: Kvlm = IndexMap::new();
     let mut pos = 0;
 

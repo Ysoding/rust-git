@@ -1,15 +1,16 @@
 use std::{
     any::Any,
-    fs,
+    fs::{self, File},
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, bail, Result};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder, Compression};
+use regex::Regex;
 use sha1::{Digest, Sha1};
 
-use crate::{repo_file, Blob, Repository};
+use crate::{ref_resolve, repo_dir, repo_file, repo_find, Blob, Commit, Repository, Tag};
 
 pub trait Object {
     /// Returns the object type as bytes (e.g. b"blob").
@@ -19,12 +20,68 @@ pub trait Object {
 }
 
 pub fn object_find(
-    _repo: &Repository,
+    repo: &Repository,
     name: &str,
-    _fmt: Option<&[u8]>,
-    _follow: bool,
-) -> Result<String> {
-    Ok(name.to_string())
+    fmt: Option<&[u8]>,
+    follow: bool,
+) -> Result<Option<String>> {
+    let mut shas = object_resolve(repo, name)?;
+
+    if shas.is_empty() {
+        bail!("No such reference {}", name);
+    }
+    if shas.len() > 1 {
+        bail!("Ambiguous reference {}: Candidates are: {:?}", name, shas);
+    }
+
+    let mut sha = shas.pop().unwrap();
+    if fmt.is_none() {
+        return Ok(Some(sha));
+    }
+    let fmt = fmt.unwrap();
+
+    loop {
+        let obj = object_read(repo, &sha)?;
+        if obj.fmt() == fmt {
+            return Ok(Some(sha));
+        }
+
+        if !follow {
+            return Ok(None);
+        }
+
+        if obj.fmt() == b"tag" {
+            let tag_obj = obj
+                .as_any()
+                .downcast_ref::<Tag>()
+                .ok_or_else(|| anyhow!("Tag object not implemented properly"))?;
+
+            let tag_sha = tag_obj
+                .kvlm
+                .get(&Some(b"object".to_vec()))
+                .and_then(|v| v.get(0))
+                .and_then(|val| String::from_utf8(val.clone()).ok())
+                .ok_or_else(|| anyhow!("Tag missing object field"))?;
+
+            sha = tag_sha;
+        } else if obj.fmt() == b"commit" && fmt == b"tree" {
+            let commit_obj = obj
+                .as_any()
+                .downcast_ref::<Commit>()
+                .ok_or_else(|| anyhow!("Not a commit"))?;
+
+            let tree_sha = commit_obj
+                .kvlm
+                .get(&Some(b"tree".to_vec()))
+                .and_then(|v| v.get(0))
+                .and_then(|val| String::from_utf8(val.clone()).ok())
+                .ok_or_else(|| anyhow!("Commit missing tree field"))?;
+
+            sha = tree_sha;
+        } else {
+            return Ok(None);
+        }
+    }
 }
 
 pub fn object_read(repo: &Repository, sha: &str) -> Result<Box<dyn Object>> {
@@ -98,4 +155,79 @@ pub fn object_write(obj: &dyn Object, repo: Option<&Repository>) -> Result<Strin
     }
 
     Ok(sha)
+}
+
+pub fn hash_object(path: &PathBuf, fmt: &[u8], write: bool) -> Result<String> {
+    let repo = if write {
+        repo_find(Path::new("."), true)?
+    } else {
+        None
+    };
+
+    let file = File::open(path)?;
+    object_hash(file, fmt, repo.as_ref())
+}
+
+pub fn object_hash<R: Read>(
+    mut reader: R,
+    fmt: &[u8],
+    repo: Option<&Repository>,
+) -> Result<String> {
+    let mut data = Vec::new();
+    reader.read_to_end(&mut data)?;
+
+    let obj: Box<dyn Object> = match fmt {
+        b"blob" => Box::new(Blob::deserialize(&data)),
+        b"commit" => bail!("commit type not implemented"),
+        b"tree" => bail!("tree type not implemented"),
+        b"tag" => bail!("tag type not implemented"),
+        _ => bail!("Unknown object type: {}", std::str::from_utf8(fmt)?),
+    };
+
+    object_write(obj.as_ref(), repo)
+}
+
+pub fn object_resolve(repo: &Repository, name: &str) -> Result<Vec<String>> {
+    let mut candidates = Vec::new();
+
+    if name.is_empty() {
+        return Ok(candidates);
+    }
+
+    if name == "HEAD" {
+        if let Some(sha) = ref_resolve(repo, "HEAD")? {
+            candidates.push(sha);
+        }
+        return Ok(candidates);
+    }
+
+    let hash_re = Regex::new(r"^[0-9A-Fa-f]{4,40}$").unwrap();
+    if hash_re.is_match(name) {
+        let lower = name.to_lowercase();
+        let prefix = &lower[0..2];
+        let objects_dir = repo_dir(repo, PathBuf::from("objects"), false)?
+            .unwrap()
+            .join(prefix);
+        if objects_dir.is_dir() {
+            for entry in fs::read_dir(objects_dir)? {
+                let entry = entry?;
+                let fname = entry.file_name().to_string_lossy().to_string();
+                if fname.starts_with(&lower[2..]) {
+                    candidates.push(format!("{}{}", prefix, fname));
+                }
+            }
+        }
+    }
+
+    // Try tags.
+    if let Some(tag_sha) = ref_resolve(repo, &format!("refs/tags/{}", name))? {
+        candidates.push(tag_sha);
+    }
+
+    // Try branches.
+    if let Some(branch_sha) = ref_resolve(repo, &format!("refs/heads/{}", name))? {
+        candidates.push(branch_sha);
+    }
+
+    Ok(candidates)
 }

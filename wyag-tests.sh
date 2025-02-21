@@ -6,7 +6,7 @@ function step() {
     echo $pos $@
 }
 
-wyag=$(realpath ./rust-git)
+wyag=$(realpath ./rgit)
 
 testdir=/tmp/wyag-tests
 if [[ -e $testdir ]]; then

@@ -2,14 +2,14 @@ all: run
 
 .PHONY: all clean run push test
 
-run: build rust-git
-	./rust-git
+run: build rgit
+	./rgit
 
 build:
-	cargo build --release && cp ./target/release/rust-git .
+	cargo build --release && cp ./target/release/rgit .
 
 clean:
-	rm -f rust-git 
+	rm -f rgit 
 
-test: rust-git 
+test: rgit
 	./wyag-tests.sh

@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::{cat_file, checkout, hash_object, log, ls_tree, repo_create};
+use crate::{cat_file, checkout, hash_object, log, ls_tree, repo_create, rev_parse, show_ref, tag};
 
 #[derive(Parser)]
-#[command(name="rit",version, about, long_about = None)]
+#[command(name="rit", version, about, long_about = None)]
 pub struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -89,11 +89,28 @@ enum Commands {
         /// A tree-ish object.
         tree: String,
     },
-    RevParse,
+    /// Parse revision (or other objects) identifiers
+    RevParse {
+        /// The name to parse
+        name: String,
+        #[arg(value_name = "type", help = "Specify the type", value_enum, default_value=None)]
+        object_type: Option<ObjectType>,
+    },
     Rm,
+    /// List references.
     ShowRef,
     Status,
-    Tag,
+    /// List and create tags.
+    Tag {
+        /// Whether to create a tag object
+        #[arg(short = 'a', default_value_t = false)]
+        crate_tag_object: bool,
+        /// The new tag's name
+        name: Option<String>,
+        /// The object the new tag will point to
+        #[arg(value_name = "object", default_value = "HEAD")]
+        obj: String,
+    },
 }
 
 pub fn start() {
@@ -104,11 +121,11 @@ pub fn start() {
         Commands::CheckIgnore => todo!(),
         Commands::Commit => todo!(),
         Commands::LsFiles => todo!(),
-        Commands::RevParse => todo!(),
         Commands::Rm => todo!(),
-        Commands::ShowRef => todo!(),
+        Commands::ShowRef => {
+            show_ref().unwrap();
+        }
         Commands::Status => todo!(),
-        Commands::Tag => todo!(),
         Commands::Init { path } => {
             repo_create(path).unwrap();
         }
@@ -136,6 +153,20 @@ pub fn start() {
         }
         Commands::Checkout { commit, path } => {
             checkout(&commit, &path).unwrap();
+        }
+        Commands::Tag {
+            crate_tag_object,
+            name,
+            obj,
+        } => {
+            tag(crate_tag_object, name, &obj).unwrap();
+        }
+        Commands::RevParse { object_type, name } => {
+            let fmt = match object_type {
+                Some(v) => Some(v.as_bytes()),
+                None => None,
+            };
+            rev_parse(&name, fmt).unwrap();
         }
     }
 }

@@ -1,4 +1,4 @@
-use rust_git::start;
+use rgit::start;
 
 fn main() {
     start();
