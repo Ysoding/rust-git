@@ -8,8 +8,8 @@ use anyhow::{bail, Result};
 use ini::Ini;
 
 pub struct Repository {
-    worktree: PathBuf,
-    gitdir: PathBuf,
+    pub worktree: PathBuf,
+    pub gitdir: PathBuf,
     _conf: Ini,
 }
 
@@ -146,6 +146,6 @@ pub fn repo_find(path: &Path, required: bool) -> Result<Option<Repository>> {
     if required {
         bail!("No git directory.");
     } else {
-        return Ok(None);
+        Ok(None)
     }
 }

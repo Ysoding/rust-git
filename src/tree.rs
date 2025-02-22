@@ -85,10 +85,6 @@ pub struct Tree {
 }
 
 impl Tree {
-    pub fn new() -> Self {
-        Self { items: Vec::new() }
-    }
-
     pub fn deserialize(data: &[u8]) -> Self {
         let items = tree_parse(data).unwrap_or_else(|_| Vec::new());
         Self { items }

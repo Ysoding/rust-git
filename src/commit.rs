@@ -113,17 +113,12 @@ pub fn kvlm_serialize(kvlm: &Kvlm) -> Vec<u8> {
     ret
 }
 
+#[derive(Default)]
 pub struct Commit {
     pub kvlm: Kvlm,
 }
 
 impl Commit {
-    pub fn new() -> Self {
-        Self {
-            kvlm: IndexMap::new(),
-        }
-    }
-
     pub fn deserialize(data: &[u8]) -> Self {
         let kvlm = kvlm_parse(data);
         Self { kvlm }

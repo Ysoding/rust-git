@@ -59,7 +59,7 @@ pub fn object_find(
             let tag_sha = tag_obj
                 .kvlm
                 .get(&Some(b"object".to_vec()))
-                .and_then(|v| v.get(0))
+                .and_then(|v| v.first())
                 .and_then(|val| String::from_utf8(val.clone()).ok())
                 .ok_or_else(|| anyhow!("Tag missing object field"))?;
 
@@ -73,7 +73,7 @@ pub fn object_find(
             let tree_sha = commit_obj
                 .kvlm
                 .get(&Some(b"tree".to_vec()))
-                .and_then(|v| v.get(0))
+                .and_then(|v| v.first())
                 .and_then(|val| String::from_utf8(val.clone()).ok())
                 .ok_or_else(|| anyhow!("Commit missing tree field"))?;
 

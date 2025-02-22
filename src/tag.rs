@@ -5,24 +5,18 @@ use std::{
 };
 
 use anyhow::Result;
-use indexmap::IndexMap;
 
 use crate::{
     kvlm_parse, kvlm_serialize, object_find, object_write, ref_list_flat, repo_dir, repo_file,
     repo_find, show_ref_print, Kvlm, Object, Repository,
 };
 
+#[derive(Default)]
 pub struct Tag {
     pub kvlm: Kvlm,
 }
 
 impl Tag {
-    pub fn new() -> Self {
-        Self {
-            kvlm: IndexMap::new(),
-        }
-    }
-
     pub fn deserialize(data: &[u8]) -> Self {
         let kvlm = kvlm_parse(data);
         Self { kvlm }
@@ -62,7 +56,7 @@ fn tag_create(repo: &Repository, name: &str, obj_ref: &str, create_tag_object: b
     let sha = object_find(repo, obj_ref, None, true)?.unwrap();
 
     if create_tag_object {
-        let mut tag = Tag::new();
+        let mut tag = Tag::default();
         tag.kvlm
             .insert(Some(b"object".to_vec()), vec![sha.clone().into_bytes()]);
         tag.kvlm

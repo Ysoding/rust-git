@@ -2,7 +2,10 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::{cat_file, checkout, hash_object, log, ls_tree, repo_create, rev_parse, show_ref, tag};
+use crate::{
+    cat_file, check_ignore, checkout, hash_object, log, ls_files, ls_tree, repo_create, rev_parse,
+    rm, show_ref, status, tag,
+};
 
 #[derive(Parser)]
 #[command(name="rit", version, about, long_about = None)]
@@ -41,7 +44,12 @@ enum Commands {
         #[arg(value_name = "object")]
         object: String,
     },
-    CheckIgnore,
+    /// Check path(s) against ignore rules.
+    CheckIgnore {
+        /// Paths to check
+        #[arg(required = true, num_args = 1.., value_parser = clap::value_parser!(PathBuf))]
+        path: Vec<PathBuf>,
+    },
     Commit,
     /// Checkout a commit inside of a directory.
     Checkout {
@@ -80,7 +88,12 @@ enum Commands {
         #[arg(default_value = "HEAD")]
         commit: String,
     },
-    LsFiles,
+    /// List all the stage files
+    LsFiles {
+        /// Show everything.
+        #[arg(short = 'v', default_value_t = false)]
+        verbose: bool,
+    },
     /// Pretty-print a tree object.
     LsTree {
         /// Recurse into sub-trees
@@ -96,9 +109,15 @@ enum Commands {
         #[arg(value_name = "type", help = "Specify the type", value_enum, default_value=None)]
         object_type: Option<ObjectType>,
     },
-    Rm,
+    /// Remove files from the working tree and the index.
+    Rm {
+        /// Files to remove
+        #[arg(required = true, num_args = 1.., value_parser = clap::value_parser!(PathBuf))]
+        path: Vec<PathBuf>,
+    },
     /// List references.
     ShowRef,
+    /// Show the working tree status.
     Status,
     /// List and create tags.
     Tag {
@@ -118,14 +137,13 @@ pub fn start() {
 
     match cli.command {
         Commands::Add => todo!(),
-        Commands::CheckIgnore => todo!(),
         Commands::Commit => todo!(),
-        Commands::LsFiles => todo!(),
-        Commands::Rm => todo!(),
         Commands::ShowRef => {
             show_ref().unwrap();
         }
-        Commands::Status => todo!(),
+        Commands::Status => {
+            status().unwrap();
+        }
         Commands::Init { path } => {
             repo_create(path).unwrap();
         }
@@ -133,7 +151,7 @@ pub fn start() {
             object_type,
             object,
         } => {
-            cat_file(&object, Some(&object_type.as_bytes())).unwrap();
+            cat_file(&object, Some(object_type.as_bytes())).unwrap();
         }
         Commands::HashObject {
             object_type,
@@ -162,11 +180,17 @@ pub fn start() {
             tag(crate_tag_object, name, &obj).unwrap();
         }
         Commands::RevParse { object_type, name } => {
-            let fmt = match object_type {
-                Some(v) => Some(v.as_bytes()),
-                None => None,
-            };
+            let fmt = object_type.map(|v| v.as_bytes());
             rev_parse(&name, fmt).unwrap();
+        }
+        Commands::LsFiles { verbose } => {
+            ls_files(verbose).unwrap();
+        }
+        Commands::CheckIgnore { path } => {
+            check_ignore(&path).unwrap();
+        }
+        Commands::Rm { path } => {
+            rm(&path).unwrap();
         }
     }
 }

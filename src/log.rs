@@ -42,7 +42,7 @@ fn log_graphviz(repo: &Repository, sha: &str, seen: &mut HashSet<String>) -> Res
         .and_then(|vecs| vecs.first())
         .unwrap_or(&tmp);
 
-    let mut message = String::from_utf8_lossy(&msg_bytes).to_string();
+    let mut message = String::from_utf8_lossy(msg_bytes).to_string();
     message = message.trim().to_string();
     if let Some(pos) = message.find('\n') {
         message = message[..pos].to_string();

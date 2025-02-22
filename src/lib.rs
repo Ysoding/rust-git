@@ -22,6 +22,53 @@ mod tag;
 pub use tag::*;
 mod log;
 pub use log::*;
+mod index;
+pub use index::*;
+mod ignore;
+pub use ignore::*;
+mod status;
+pub use status::*;
+
+pub fn rm(paths: &[PathBuf]) -> Result<()> {
+    let repo = repo_find(Path::new("."), true)?.unwrap();
+    Ok(())
+}
+
+pub fn ls_files(verbose: bool) -> Result<()> {
+    let repo = repo_find(Path::new("."), true)?.unwrap();
+    let index = index_read(&repo)?;
+    if verbose {
+        println!(
+            "Index file format v{}, containing {} entries.",
+            index.version,
+            index.entries.len()
+        );
+    }
+
+    for entry in index.entries {
+        println!("{}", entry.name);
+        if verbose {
+            let entry_type = match entry.mode_type {
+                0b1000 => "regular file",
+                0b1010 => "symlink",
+                0b1110 => "git link",
+                _ => "unknown",
+            };
+            println!("  {} with perms: {:o}", entry_type, entry.mode_perms);
+            println!("  on blob: {}", entry.sha);
+            println!("  created: {}.{}", entry.ctime.0, entry.ctime.1);
+            println!("  modified: {}.{}", entry.mtime.0, entry.mtime.1);
+            println!("  device: {}, inode: {}", entry.dev, entry.ino);
+            println!("  user: {}  group: {}", entry.uid, entry.gid);
+            println!(
+                "  flags: stage={} assume_valid={}",
+                entry.flag_stage, entry.flag_assume_valid
+            );
+        }
+    }
+
+    Ok(())
+}
 
 pub fn rev_parse(name: &str, fmt: Option<&[u8]>) -> Result<()> {
     let repo = repo_find(Path::new("."), true).unwrap().unwrap();
@@ -54,7 +101,7 @@ pub fn checkout(commit: &str, target: &PathBuf) -> Result<()> {
         let tree_sha = commit_obj
             .kvlm
             .get(&Some(b"tree".to_vec()))
-            .and_then(|v| v.get(0))
+            .and_then(|v| v.first())
             .and_then(|val| String::from_utf8(val.clone()).ok())
             .ok_or_else(|| anyhow!("Commit missing tree field"))?;
         obj = object_read(&repo, &tree_sha)?;
@@ -73,7 +120,7 @@ pub fn checkout(commit: &str, target: &PathBuf) -> Result<()> {
     tree_checkout(&repo, obj.as_ref(), target)
 }
 
-fn tree_checkout(repo: &Repository, tree_obj: &dyn Object, path: &PathBuf) -> Result<()> {
+fn tree_checkout(repo: &Repository, tree_obj: &dyn Object, path: &Path) -> Result<()> {
     let tree = tree_obj
         .as_any()
         .downcast_ref::<Tree>()
@@ -111,8 +158,10 @@ fn ref_resolve(repo: &Repository, refname: &str) -> Result<Option<String>> {
 
     let data = fs::read_to_string(&path)?;
     let data = data.trim_end();
-    if data.starts_with("ref: ") {
-        ref_resolve(repo, &data[5..])
+    if let Some(p) = data.strip_prefix("ref: ") {
+        ref_resolve(repo, p)
+    // if data.starts_with("ref: ") {
+    // ref_resolve(repo, &data[5..])
     } else {
         Ok(Some(data.to_string()))
     }
@@ -124,11 +173,12 @@ fn ref_list_flat(
     prefix: Option<&str>,
 ) -> Result<IndexMap<String, String>> {
     let mut ret = IndexMap::new();
-    let path = if path.is_none() {
-        repo_dir(&repo, PathBuf::from("refs"), false)?.unwrap()
-    } else {
-        path.unwrap()
+
+    let path = match path {
+        Some(p) => p,
+        None => repo_dir(repo, PathBuf::from("refs"), false)?.unwrap(),
     };
+
     let mut entries: Vec<_> = fs::read_dir(path)?.filter_map(|e| e.ok()).collect();
     entries.sort_by_key(|e| e.file_name());
 
@@ -143,10 +193,8 @@ fn ref_list_flat(
         if p.is_dir() {
             let sub = ref_list_flat(repo, Some(p), Some(&full_name))?;
             ret.extend(sub);
-        } else {
-            if let Some(sha) = ref_resolve(repo, &p.to_string_lossy())? {
-                ret.insert(full_name, sha);
-            }
+        } else if let Some(sha) = ref_resolve(repo, &p.to_string_lossy())? {
+            ret.insert(full_name, sha);
         }
     }
 
